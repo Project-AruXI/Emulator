@@ -15,13 +15,8 @@ shell:
 	(cd shell && make $@)
 
 debug:
-	(cd build-utils && make $@)
 	(cd emulator && make $@)
 	(cd shell && make $@)
-
-test:
-	(cd testsuite/assembler && go test)
-
 
 clean:
 	(cd emulator && make $@)

@@ -29,6 +29,7 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 	if (ptr == MAP_FAILED) dFatal(D_ERR_INTERNAL, "Could not map file!");
 	close(fd);
 
+	uint8_t* kernimg = (uint8_t*) ptr;
 	AOEFFheader* header = (AOEFFheader*) ptr;
 
 	// Check it is an AOEFF and it is type kernel
@@ -37,9 +38,6 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 
 	if (header->hType != AHT_KERN) dFatal(D_ERR_INVALID_FORMAT, "File is not a kernel image!");
 
-	uint8_t* kernimg = (uint8_t*) ptr;
-	
-	AOEFFheader* header = (AOEFFheader*) kernimg;
 	uint32_t kernEntry = header->hEntry;
 
 	AOEFFSectHeader* sectHdrs = (AOEFFSectHeader*)(kernimg + header->hSectOff);

@@ -334,7 +334,7 @@ static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell
 		exit(0);
 	}
 
-	if (argc - nparsed < 1) {
+	if (nparsed < 1) {
 		dFatal(D_ERR_IO, "No kernel image specified!");
 		argparse_usage(&argparse);
 	}
@@ -353,13 +353,13 @@ int main(int argc, char const* argv[]) {
 	kernimgFilename = parseArgs(argc, argv, &cpuimg, &shell, &log);
 
 	int shellExists = access(shell, F_OK);
-	if (shellExists == -1) dFatal(D_ERR_IO, "No shell binary!");
+	if (shellExists == -1) dFatal(D_ERR_IO, "Shell binary `%s` does not exist.", shell);
 
 	int cpuExists = access(cpuimg, F_OK);
-	if (cpuExists == -1) dFatal(D_ERR_IO, "No CPU binary!");
+	if (cpuExists == -1) dFatal(D_ERR_IO, "CPU binary `%s` does not exist.", cpuimg);
 
 	char* ext = strstr(kernimgFilename, ".ark");
-	if (!ext) dFatal(D_ERR_IO, "Kernel image does not end in '.ark'!");
+	if (!ext) dFatal(D_ERR_IO, "Kernel image does not end in `.ark`.");
 
 	dDebug(DB_BASIC, "Kernel file image is %s", kernimgFilename);
 
