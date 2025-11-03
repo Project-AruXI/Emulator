@@ -1,13 +1,15 @@
 SHARED = ../shared
+COMMON = ../common
 HEADERS = ../headers
 OUT = ../out
 
 CC = gcc
 CFLAGS = -Wall
-INCLUDES = -I$(HEADERS)/emulator -I$(HEADERS) -I../common
+INCLUDES = -I$(HEADERS)/emulator -I$(HEADERS) -I$(COMMON)
 
 SRCS = emulator.c loader.c backend-os.c \
 	$(SHARED)/diagnostics.c $(SHARED)/emSignal.c $(SHARED)/signalHandler.c $(SHARED)/sigHeap.c
+LIBS = $(COMMON)/libargparse.a
 TARGET = $(OUT)/ruemu
 
 
@@ -19,7 +21,7 @@ OBJS = $(SRCS:%.c=%.o)
 all: cpu ruemu
 
 ruemu: $(OBJS)
-	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS)
+	$(CC) $(CFLAGS) -o $(TARGET) $(OBJS) $(LIBS)
 
 cpu:
 	(cd cpu && make $@)
