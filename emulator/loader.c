@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -12,11 +13,31 @@
 #include "memsects.h"
 
 
-/**
- * Loads the kernel image binary into an mmap'd space for easy of acess, checking that the binary is in the proper format.
- * @param filename 
- * @return The pointer to the mmapd' binary
- */
+DyLibCache dylibCache;
+
+static void addLibToCache(DyLibCache* cache, char* libname, uint32_t vaddr, uint8_t* paddr, DyLibSymb* symbs, uint32_t symbCount) {
+	// For now, the cache will be linear
+	// But since search time will be O(n^2) to search for dylib name then symbol name, improvements need to be made
+	// Maybe via hashing
+
+	if (cache->count == cache->cap) {
+		uint32_t newCap = (cache->cap == 0) ? 4 : cache->cap * 2;
+		DyLib* newLibs = (DyLib*) realloc(cache->libs, sizeof(DyLib) * newCap);
+		if (!newLibs) dFatal(D_ERR_MEM, "Could not allocate memory for dynamic library cache!");
+
+		cache->libs = newLibs;
+		cache->cap = newCap;
+	}
+
+	DyLib* dylib = &cache->libs[cache->count++];
+	dylib->libname = strdup(libname);
+	dylib->vaddr = vaddr;
+	dylib->paddr = paddr;
+	dylib->symbols.symbs = symbs;
+	dylib->symbols.count = symbCount;
+}
+
+
 uint32_t loadKernel(char* filename, uint8_t* memory) {
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) dFatal(D_ERR_IO, "Could not open kernel image %s!", filename);
@@ -77,11 +98,9 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 	return kernEntry;
 }
 
-
 uint32_t loadBinary(char* filename, uint8_t* memory) {
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) dFatal(D_ERR_IO, "Could not open program 0x`%x` (@`%p`)!", filename, filename);
-
 
 	struct stat statBuffer;
 	int rc = fstat(fd, &statBuffer);
@@ -161,6 +180,94 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 	return entry;
 }
 
-void loadLibrary(char* filename, uint8_t* memory) {
+void loadDefaultLibraries(uint8_t* memory) {
+	// Just a wrapper around loadLibrary
+
+	char* defaultLibs[] = {
+		"std",
+	};
+
+	for (int i = 0; i < 1; i++) {
+		if (loadLibrary(defaultLibs[i], memory) == -1) {
+			// Defaults could not be found, quit
+			dFatal(D_ERR_DLIB, "Default mandatory library cannot be loaded. Ensure the library is present.");
+		}
+	}
+}
+
+static bool loadLibBinary(char* path, char* libname) {
+	int fd = open(path, O_RDONLY);
+	if (fd < 0) return false;
+
+	struct stat statBuffer;
+	int rc = fstat(fd, &statBuffer);
+	if (rc != 0) {
+		write(STDERR_FILENO, "Could not stat file descriptor!", 31);
+		dFatal(D_ERR_IO, "Could not stat file descriptor!");
+	}
+
+	void* ptr = mmap(0, statBuffer.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (ptr == MAP_FAILED) {
+		write(STDERR_FILENO, "Could not map file\n", 19);
+		dFatal(D_ERR_INTERNAL, "Could not map file!");
+	}
+	close(fd);
+
+	write(STDOUT_FILENO, "MMAP'd\n", 7);
+
+	uint8_t* binary = (uint8_t*) ptr;
+	AOEFFheader* header = (AOEFFheader*) ptr;
+
+	// Check it is an AOEFF and it is type executable
+	if (header->hID[AHID_0] != AH_ID0 && header->hID[AHID_1] != AH_ID1 && 
+			header->hID[AHID_2] != AH_ID2 && header->hID[AH_ID3] != AH_ID3) dFatal(D_ERR_INVALID_FORMAT, "File is not an AOEFF!");
+
+	if (header->hType != AHT_DLIB) dFatal(D_ERR_INVALID_FORMAT, "File is not a dynamic library!");
+
+	uint32_t libstartVAddr = 0x0; // Where the library is loaded in the emulated memory
+	uint8_t* libstartPAddr = NULL; // The real address in shared memory
+
+	DyLibSymb* symbs = (DyLibSymb*) malloc(sizeof(DyLibSymb) * header->hSymbSize);
+	if (!symbs) dFatal(D_ERR_MEM, "Could not allocate memory for dynamic library cache symbols.");
+
+	AOEFFSymbEntry* symbTable = binary + header->hSymbOff;
+
+	// TODO: Once the file format structure and linking stuff has been figured out, implement this
+
+	addLibToCache(&dylibCache, libname, libstartVAddr, libstartPAddr, symbs, header->hSymbSize);
+
+	return true;
+}
+
+int loadLibrary(char* filename, uint8_t* memory) {
+	if (strstr(filename, ".adlib")) {
+		dLog(D_NONE, DSEV_WARN, "Extension is assumed. Ignoring.");
+		return 1;
+	}
+
+	char* defaultLibPaths[] = {
+		".", // For now, have the current directory be the default path
+	};
 	
+	for (int i = 0; i < 1; i++) {
+		char* libpath = defaultLibPaths[i];
+
+		char* fullPath = (char*) malloc(sizeof(char) * strlen(libpath) + strlen(filename) + 8);
+		if (!fullPath) dFatal(D_ERR_MEM, "Could not allocate memory for path.");
+
+		sprintf(fullPath, "%s/%s.adlib", libpath, filename);
+
+		if (loadLibBinary(fullPath, filename)) {
+			free(fullPath);
+			return 0;
+		}
+
+		free(fullPath);
+	}
+
+	dLog(D_NONE, DSEV_WARN, "Library `%s.adlib` could not be found.", filename);
+	return -1;
+}
+
+void loadLibraryRuntime(char* filename, uint8_t* memory) {
 }

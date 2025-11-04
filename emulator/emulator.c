@@ -307,6 +307,27 @@ static pid_t runCPU(char* cpuExe, bool log) {
 	return pid;
 }
 
+
+static int loadLib(struct argparse* self, const struct argparse_option* option) {
+	if (!self->optvalue) dFatal(D_ERR_IO, "No library file specified to load!");
+
+	if (strchr(self->optvalue, ',')) {
+		char* libs = strdup(self->optvalue);
+		char* token = strtok(libs, ",");
+		while (token != NULL) {
+			dLog(D_NONE, DSEV_INFO, "Loading library `%s` at startup...", token);
+			loadLibrary(token, (uint8_t*) emulatedMemory);
+			token = strtok(NULL, ",");
+		}
+		free(libs);
+	} else {
+		dLog(D_NONE, DSEV_INFO, "Loading library `%s` at startup...", self->optvalue);
+		loadLibrary((char*) self->optvalue, (uint8_t*) emulatedMemory);
+	}
+
+	return 0;
+}
+
 static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell, bool* log) {
 	bool showVersion = false;
 
@@ -314,6 +335,7 @@ static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell
 		OPT_STRING('c', "cpu", cpuimg, "Path to CPU binary image", NULL, 0, 0),
 		OPT_STRING('s', "shell", shell, "Path to shell binary", NULL, 0, 0),
 		OPT_BOOLEAN('l', "log", log, "Enable logging", NULL, 0, 0),
+		OPT_STRING('-', "libload", NULL, "Load shared library at startup", &loadLib, 0, 0),
 		OPT_BOOLEAN('v', "version", &showVersion, "Show version information", NULL, 0, 0),
 		OPT_HELP(),
 		OPT_END()
@@ -339,7 +361,7 @@ static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell
 		argparse_usage(&argparse);
 	}
 
-	return (char*) argv[nparsed];
+	return (char*) argv[0];
 }
 
 int main(int argc, char const* argv[]) {
@@ -367,6 +389,7 @@ int main(int argc, char const* argv[]) {
 	dLog(D_NONE, DSEV_INFO, "Creating environment...");
 	emulatedMemory = createMemory();
 	signalsMemory = createSignalMemory();
+	loadDefaultLibraries((uint8_t*) emulatedMemory);
 	setupSignals(signalsMemory);
 	dDebug(DB_DETAIL, "Set signals as clean");
 
@@ -416,7 +439,6 @@ int main(int argc, char const* argv[]) {
 	close(savedOut);
 	close(savedErr);
 
-	// if (shellStatus == -1) fprintf(stdout, "Shell process ended")
 	if (WEXITSTATUS(shellStatus != 0)) dLog(D_NONE, DSEV_WARN, "Shell process ended abnormally. Check the logs.");
 	if (WEXITSTATUS(cpuStatus) != 0) dLog(D_NONE, DSEV_WARN, "CPU process ended abnormally. Check the logs.");
 

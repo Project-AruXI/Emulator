@@ -17,7 +17,7 @@ int DebugLevel = DEBUG_L;
 static FILE* debugStream;
 static char buffer[150];
 
-static char* errnames[D_ERR_INVALID_KERNEL+1] = {
+static char* errnames[D_ERR_DLIB+1] = {
 	"",
 	"INTERNAL ERROR",
 	"IO ERROR",
@@ -26,7 +26,8 @@ static char* errnames[D_ERR_INVALID_KERNEL+1] = {
 	"MEMORY ERROR",
 
 	"INVALID FORMAT ERROR",
-	"INVALID KERNEL ERROR"
+	"INVALID KERNEL ERROR",
+	"DYNAMIC LIBRARY ERROR"
 };
 
 void initDiagnostics(FILE* stream, char* debugFile) {
