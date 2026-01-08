@@ -295,6 +295,9 @@ static void decode() {
 	opcode_t code = imap[opcode];
 	FetchCtx.opcode = code;
 
+	// Intervene for aliased instructions
+	if (FetchCtx.instrbits == 0x800003de) code = OP_NOP; // NOP
+
 	dLog(D_NONE, DSEV_INFO, "decode::Opcode: 0x%x; code %d -> %s", opcode, code, (code != OP_ERROR) ? istrmap[code] : "OP_ERROR");
 
 	// Invalid instruction

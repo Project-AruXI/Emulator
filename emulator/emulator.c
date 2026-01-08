@@ -389,7 +389,7 @@ int main(int argc, char const* argv[]) {
 	dLog(D_NONE, DSEV_INFO, "Creating environment...");
 	emulatedMemory = createMemory();
 	signalsMemory = createSignalMemory();
-	loadDefaultLibraries((uint8_t*) emulatedMemory);
+	// loadDefaultLibraries((uint8_t*) emulatedMemory);
 	setupSignals(signalsMemory);
 	dDebug(DB_DETAIL, "Set signals as clean");
 

@@ -202,7 +202,7 @@ void initIMap() {
 	imap[0b01001101] = OP_ASR;
 	// imap[0b10011000] = OP_CMP; // cmpi aliased as subsi
 	// imap[0b10011001] = OP_CMP; // cmpr aliased as subsr
-	// imap[0b10000000] = OP_MV; // mvi aliased as addi
+	imap[0b10000100] = OP_MV;
 	// imap[0b10000001] = OP_MV; // mvr aliased as orr
 	// imap[0b10010000] = OP_MVN; // mvni aliased as subi
 	// imap[0b10010001] = OP_MVN; // mvnr aliased as subr

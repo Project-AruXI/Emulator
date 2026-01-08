@@ -51,7 +51,7 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 	close(fd);
 
 	uint8_t* kernimg = (uint8_t*) ptr;
-	AOEFFheader* header = (AOEFFheader*) ptr;
+	AOEFFhdr* header = (AOEFFhdr*) ptr;
 
 	// Check it is an AOEFF and it is type kernel
 	if (header->hID[AHID_0] != AH_ID0 && header->hID[AHID_1] != AH_ID1 && 
@@ -61,12 +61,12 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 
 	uint32_t kernEntry = header->hEntry;
 
-	AOEFFSectHeader* sectHdrs = (AOEFFSectHeader*)(kernimg + header->hSectOff);
+	AOEFFSectHdr* sectHdrs = (AOEFFSectHdr*)(kernimg + header->hSectOff);
 	uint32_t sectHdrsSize = header->hSectSize;
 
 	// Set the data and text information
 	for (uint32_t i = 0; i < sectHdrsSize; i++) {
-		AOEFFSectHeader* sectHdr = &(sectHdrs[i]);
+		AOEFFSectHdr* sectHdr = &(sectHdrs[i]);
 
 		if (strncmp(".data", sectHdr->shSectName, 8) == 0) {
 			uint8_t* dataStart = memory + KERN_DATA; // beginning of emulated memory kernel data
@@ -119,7 +119,7 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 	write(STDOUT_FILENO, "MMAP'd\n", 7);
 
 	uint8_t* binary = (uint8_t*) ptr;
-	AOEFFheader* header = (AOEFFheader*) ptr;
+	AOEFFhdr* header = (AOEFFhdr*) ptr;
 
 	// Check it is an AOEFF and it is type executable
 	if (header->hID[AHID_0] != AH_ID0 && header->hID[AHID_1] != AH_ID1 && 
@@ -132,12 +132,12 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 	// Now that it is mmap'd, load the contents
 	write(STDOUT_FILENO, "Checked format, will load\n", 26);
 
-	AOEFFSectHeader* sectHdrs = (AOEFFSectHeader*)(binary + header->hSectOff);
+	AOEFFSectHdr* sectHdrs = (AOEFFSectHdr*)(binary + header->hSectOff);
 	uint32_t sectHdrsSize = header->hSectSize;
 
 	// Set the data and text information
 	for (uint32_t i = 0; i < sectHdrsSize; i++) {
-		AOEFFSectHeader* sectHdr = &(sectHdrs[i]);
+		AOEFFSectHdr* sectHdr = &(sectHdrs[i]);
 
 		// Make sure size of each section does not exceed allowed size in memory
 		// Except considering the size allocated, no need, at least for now
@@ -216,7 +216,7 @@ static bool loadLibBinary(char* path, char* libname) {
 	write(STDOUT_FILENO, "MMAP'd\n", 7);
 
 	uint8_t* binary = (uint8_t*) ptr;
-	AOEFFheader* header = (AOEFFheader*) ptr;
+	AOEFFhdr* header = (AOEFFhdr*) ptr;
 
 	// Check it is an AOEFF and it is type executable
 	if (header->hID[AHID_0] != AH_ID0 && header->hID[AHID_1] != AH_ID1 && 
@@ -230,7 +230,7 @@ static bool loadLibBinary(char* path, char* libname) {
 	DyLibSymb* symbs = (DyLibSymb*) malloc(sizeof(DyLibSymb) * header->hSymbSize);
 	if (!symbs) dFatal(D_ERR_MEM, "Could not allocate memory for dynamic library cache symbols.");
 
-	AOEFFSymbEntry* symbTable = binary + header->hSymbOff;
+	AOEFFSymEnt* symbTable = binary + header->hSymbOff;
 
 	// TODO: Once the file format structure and linking stuff has been figured out, implement this
 
