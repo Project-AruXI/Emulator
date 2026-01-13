@@ -33,8 +33,8 @@ static void addLibToCache(DyLibCache* cache, char* libname, uint32_t vaddr, uint
 	dylib->libname = strdup(libname);
 	dylib->vaddr = vaddr;
 	dylib->paddr = paddr;
-	dylib->symbols.symbs = symbs;
-	dylib->symbols.count = symbCount;
+	// dylib->symbols.symbs = symbs;
+	// dylib->symbols.count = symbCount;
 }
 
 
@@ -195,7 +195,7 @@ void loadDefaultLibraries(uint8_t* memory) {
 	}
 }
 
-static bool loadLibBinary(char* path, char* libname) {
+static bool loadLibBinary(char* path, char* libname, uint8_t* memory) {
 	int fd = open(path, O_RDONLY);
 	if (fd < 0) return false;
 
@@ -218,23 +218,94 @@ static bool loadLibBinary(char* path, char* libname) {
 	uint8_t* binary = (uint8_t*) ptr;
 	AOEFFhdr* header = (AOEFFhdr*) ptr;
 
-	// Check it is an AOEFF and it is type executable
+	// Check it is an AOEFF and it is type library
 	if (header->hID[AHID_0] != AH_ID0 && header->hID[AHID_1] != AH_ID1 && 
 			header->hID[AHID_2] != AH_ID2 && header->hID[AH_ID3] != AH_ID3) dFatal(D_ERR_INVALID_FORMAT, "File is not an AOEFF!");
 
 	if (header->hType != AHT_DLIB) dFatal(D_ERR_INVALID_FORMAT, "File is not a dynamic library!");
 
-	uint32_t libstartVAddr = 0x0; // Where the library is loaded in the emulated memory
-	uint8_t* libstartPAddr = NULL; // The real address in shared memory
+	// The start vaddr of this library is the start of the previous library + size of previous library
+	// If no current libraries, start at the default library area
+	uint32_t libstartVAddr = SYS_LIB; // Where the library is loaded in the emulated memory
+	uint8_t* libstartPAddr = memory + SYS_LIB; // The real address in shared memory
+	if (dylibCache.count != 0) {
+		DyLib* prevLib = &dylibCache.libs[dylibCache.count - 1];
+		libstartVAddr = prevLib->vaddr + prevLib->size;
+		libstartPAddr = prevLib->paddr + prevLib->size;
+	}
+
 
 	DyLibSymb* symbs = (DyLibSymb*) malloc(sizeof(DyLibSymb) * header->hSymbSize);
 	if (!symbs) dFatal(D_ERR_MEM, "Could not allocate memory for dynamic library cache symbols.");
 
-	AOEFFSymEnt* symbTable = binary + header->hSymbOff;
+	AOEFFExportEnt* exportSymbols = (AOEFFExportEnt*)(binary + header->hExportTabOff);
+	char* strTab = (char*)(binary + header->hStrTabOff);
+	AOEFFSymEnt* symbTab = (AOEFFSymEnt*)(binary + header->hSymbOff);
 
-	// TODO: Once the file format structure and linking stuff has been figured out, implement this
+	for (uint32_t i = 0; i < header->hExportTabSize; i++) {
+		AOEFFExportEnt exportEnt = exportSymbols[i];
+		AOEFFSymEnt symbEnt = symbTab[exportEnt.eeSymb];
+
+		char* symbName = strTab + symbEnt.seSymbName;
+		uint32_t symbVal = libstartVAddr + exportEnt.eeAddress; // The value is the updated address in emulated memory
+		// eeAddress gives the offset from the start of the library (aka from 0x0)
+		// It needs to be updated to the actual address in emulated memory
+
+		symbs[i].symbname = strdup(symbName);
+		symbs[i].symbval = symbVal;
+
+		dDebug(DB_DETAIL, "Saved symbol `%s` with value 0x%x to cache", symbName, symbVal);
+	}
 
 	addLibToCache(&dylibCache, libname, libstartVAddr, libstartPAddr, symbs, header->hSymbSize);
+
+	// Place the binary in the emulated memory
+	// Refer to the documentation of the layout
+
+	AOEFFSectHdr* sectHdrs = (AOEFFSectHdr*)(binary + header->hSectOff);
+
+	uint32_t currentSectionOffset = libstartVAddr; // The offset (in emulated memory) of the current section being loaded
+
+	uint8_t* libBinaryBss = NULL;
+	uint8_t* libBinaryConst = NULL;
+	uint8_t* libBinaryData = NULL;
+	uint8_t* libBinaryText = NULL;
+	for (uint32_t i = 0; i < header->hSectSize; i++) {
+		AOEFFSectHdr sectHdr = sectHdrs[i];
+		
+		if (sectHdr.shSectName[1] == 'b' && sectHdr.shSectSize != 0) libBinaryBss = binary + sectHdr.shSectOff;
+		else if (sectHdr.shSectName[1] == 'c' && sectHdr.shSectSize != 0) libBinaryConst = binary + sectHdr.shSectOff;
+		else if (sectHdr.shSectName[1] == 'd' && sectHdr.shSectSize != 0) libBinaryData = binary + sectHdr.shSectOff;
+		else if (sectHdr.shSectName[1] == 't' && sectHdr.shSectSize != 0) libBinaryText = binary + sectHdr.shSectOff;
+	}
+
+	// Copy sections in order: bss, const, data, text
+	if (libBinaryBss) {
+		uint8_t* sectStart = memory + currentSectionOffset;
+		memset(sectStart, 0, sectHdrs[0].shSectSize); // Is it needed????
+		currentSectionOffset += sectHdrs[0].shSectSize;
+	}
+	if (libBinaryConst) {
+		uint8_t* sectStart = memory + currentSectionOffset;
+		memcpy(sectStart, libBinaryConst, sectHdrs[1].shSectSize);
+		currentSectionOffset += sectHdrs[1].shSectSize;
+	}
+	if (libBinaryData) {
+		uint8_t* sectStart = memory + currentSectionOffset;
+		memcpy(sectStart, libBinaryData, sectHdrs[2].shSectSize);
+		currentSectionOffset += sectHdrs[2].shSectSize;
+	}
+	if (libBinaryText) {
+		uint8_t* sectStart = memory + currentSectionOffset;
+		memcpy(sectStart, libBinaryText, sectHdrs[3].shSectSize);
+		currentSectionOffset += sectHdrs[3].shSectSize;
+	}
+
+	// relocate(binary, memory, libstartVAddr);
+
+	dLog(D_NONE, DSEV_INFO, "Loaded library `%s` at 0x%x (%p)", libname, libstartVAddr, libstartPAddr);
+
+	munmap(ptr, statBuffer.st_size);
 
 	return true;
 }
@@ -248,7 +319,7 @@ int loadLibrary(char* filename, uint8_t* memory) {
 	char* defaultLibPaths[] = {
 		".", // For now, have the current directory be the default path
 	};
-	
+
 	for (int i = 0; i < 1; i++) {
 		char* libpath = defaultLibPaths[i];
 
@@ -257,7 +328,7 @@ int loadLibrary(char* filename, uint8_t* memory) {
 
 		sprintf(fullPath, "%s/%s.adlib", libpath, filename);
 
-		if (loadLibBinary(fullPath, filename)) {
+		if (loadLibBinary(fullPath, filename, memory)) {
 			free(fullPath);
 			return 0;
 		}

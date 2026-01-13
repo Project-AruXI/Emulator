@@ -30,6 +30,7 @@ SigMem* signalsMemory;
 void* emulatedMemory;
 
 
+
 /** For the emulator to handle the internal signals (via emSignal) or external (regular SIG*) **/
 
 /**
@@ -335,8 +336,8 @@ static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell
 		OPT_STRING('c', "cpu", cpuimg, "Path to CPU binary image", NULL, 0, 0),
 		OPT_STRING('s', "shell", shell, "Path to shell binary", NULL, 0, 0),
 		OPT_BOOLEAN('l', "log", log, "Enable logging", NULL, 0, 0),
-		OPT_STRING('-', "libload", NULL, "Load shared library at startup", &loadLib, 0, 0),
-		OPT_BOOLEAN('v', "version", &showVersion, "Show version information", NULL, 0, 0),
+		OPT_STRING('\0', "libload", NULL, "Load shared library at startup", &loadLib, 0, 0),
+		OPT_BOOLEAN('v', "version", &showVersion, "Show version and exit", NULL, 0, 0),
 		OPT_HELP(),
 		OPT_END()
 	};
@@ -357,8 +358,8 @@ static char* parseArgs(int argc, char const* argv[], char** cpuimg, char** shell
 	}
 
 	if (nparsed < 1) {
-		dFatal(D_ERR_IO, "No kernel image specified!");
 		argparse_usage(&argparse);
+		exit(-1);
 	}
 
 	return (char*) argv[0];
@@ -389,7 +390,7 @@ int main(int argc, char const* argv[]) {
 	dLog(D_NONE, DSEV_INFO, "Creating environment...");
 	emulatedMemory = createMemory();
 	signalsMemory = createSignalMemory();
-	// loadDefaultLibraries((uint8_t*) emulatedMemory);
+	loadDefaultLibraries((uint8_t*) emulatedMemory);
 	setupSignals(signalsMemory);
 	dDebug(DB_DETAIL, "Set signals as clean");
 

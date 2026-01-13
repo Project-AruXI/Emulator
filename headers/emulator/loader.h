@@ -6,14 +6,14 @@
 
 typedef struct DynamicLibrarySymbol {
 	const char* symbname; // The name of the symbol
-	uint32_t vaddr; // The address in emulated memory
-	uint8_t* paddr; // The real address in the shared memory
+	uint32_t symbval; // The value of the symbol
 } DyLibSymb;
 
 typedef struct DynamicLibrary {
 	const char* libname; // The name of the library
 	uint32_t vaddr; // The address in emulated memory that the library is loaded at
 	uint8_t* paddr; // The real address in the shared memory that the library is loaded at
+	uint32_t size; // The size of the library
 
 	struct {
 		DyLibSymb* symbs;
@@ -78,6 +78,17 @@ int loadLibrary(char* filename, uint8_t* memory);
  * @param memory The emulated memory
  */
 void loadLibraryRuntime(char* filename, uint8_t* memory);
+
+
+/** Relocations */
+
+/**
+ * @brief Relocates the given binary in the emulated memory space.
+ * @param binary The binary image
+ * @param memory The emulated memory
+ * @param vAddr The start address of the binary in emulated memory
+ */
+void relocate(uint8_t* binary, uint8_t* memory, uint32_t vAddr);
 
 
 #endif
