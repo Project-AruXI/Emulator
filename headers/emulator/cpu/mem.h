@@ -9,6 +9,7 @@
 typedef enum memerr {
 	MEMERR_INTERNAL,
 	MEMERR_NONE,
+	MEMERR_ALIGN,
 
 	MEMERR_KERN_OVERFLOW, // Overflowing into other sections
 	MEMERR_KERN_OVERREAD, // Overreading into other sections

@@ -9,6 +9,9 @@ extern core_t core;
 extern uint8_t* emMem;
 
 memerr_t validKIMemAddr(uint32_t addr) {
+	// Check alignment first
+	if (addr % 4 != 0) return MEMERR_ALIGN;
+
 	bool inTextSect = (addr < KERN_HEAP && addr >= KERN_TEXT);
 	dDebug(DB_TRACE, "addr 0x%x in text? %d", addr, inTextSect);
 	bool inSyslib = (addr <= SYS_LIB_LIMIT && addr >= SYS_LIB);
@@ -22,6 +25,9 @@ memerr_t validKIMemAddr(uint32_t addr) {
 }
 
 memerr_t validUIMemAddr(uint32_t addr) {
+	// Check alignment first
+	if (addr % 4 != 0) return MEMERR_ALIGN;
+
 	bool inTextSect = (addr < USER_HEAP && addr >= USER_TEXT);
 	bool inSyslib = (addr <= SYS_LIB_LIMIT && SYS_LIB);
 

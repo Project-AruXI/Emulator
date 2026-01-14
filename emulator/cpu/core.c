@@ -86,12 +86,23 @@ static void fetch() {
 				case MEMERR_USER_OVERREAD:
 					dLog(D_NONE, DSEV_WARN, "User code attempted to overread from an allowed address");
 					break;
+				case MEMERR_ALIGN:
+					dLog(D_NONE, DSEV_WARN, "User code attempted to access unaligned memory address");
+					break;
 				default:
 					break;
 			}
 			exception(EXCPN_ABORT_ACCESS);
 		} else {
-			dLog(D_NONE, DSEV_WARN, "Kernel code attempted to access outside of permissible range!");
+			// dLog(D_NONE, DSEV_WARN, "Kernel code attempted to access outside of permissible range!");
+			switch (err) {
+				case MEMERR_ALIGN:
+					dLog(D_NONE, DSEV_WARN, "Kernel code attempted to access unaligned memory address");
+					break;
+				default:
+					dLog(D_NONE, DSEV_WARN, "Kernel code attempted to access outside of permissible sections");
+					break;
+			}
 			fault();
 		}
 	}
@@ -106,13 +117,16 @@ void extractImm() {
 	int32_t simm19 = (int32_t) s32bitextract(FetchCtx.instrbits, 5, 19);
 	int16_t simm9 = s32bitextract(FetchCtx.instrbits, 15, 9);
 
+	dDebug(DB_DETAIL, "extractImm::imm14: 0x%x; simm24: 0x%x; simm19: 0x%x; simm9: 0x%x...from bits 0x%x", imm14, simm24, simm19, simm9, FetchCtx.instrbits);
+
 	opcode_t opcode = FetchCtx.opcode;
 	itype_t type = NO_TYPE;
 	int32_t imm = 0x0;
 
-	if (opcode >= OP_NOP && opcode <= OP_CMP) {
+	if (opcode >= OP_NOP && opcode <= OP_MV) {
 		if (((((FetchCtx.instrbits >> 24) & 0xff) & 0b1) == 0b0) && (opcode < OP_MUL || opcode > OP_SDIV)) {
 			imm = imm14; // I-types
+			dDebug(DB_DETAIL, "extractImm::Detected I-type with imm14: 0x%x", imm14);
 			type = I_TYPE;
 		} else type = R_TYPE;
 	} else if (opcode >= OP_LD && opcode <= OP_STRH) {
@@ -260,13 +274,14 @@ static void nextIR() {
 			// Intercept for ALU to do LR := IR + 4
 			
 			DecodeCtx.rd = 28; // LR
-			ExecuteCtx.aluVala = core.IR-4; // undo the +4
+			ExecuteCtx.aluVala = core.IR-4; // undo the +4 that was done automatically after fetching
 			ExecuteCtx.aluValb = 0x4;
 
 			dLog(D_NONE, DSEV_INFO, "execute::call val a: 0x%x; val b: 0x%x; rd: %d", ExecuteCtx.aluVala, ExecuteCtx.aluValb, DecodeCtx.rd);
 		}
 		// IR += 4 was done automatically after imem, reverse it
-		core.IR = (core.IR-4) + (((int32_t)(((DecodeCtx.imm & 0xffffff) << 2) << 9)) >> 9);
+		core.IR = (core.IR-4) + (((int32_t)(((DecodeCtx.imm & 0xffffff) >> 2) << 9)) >> 9);
+		dDebug(DB_DETAIL, "nextIR::imm: 0x%x; imm shifted: 0x%x; new IR: 0x%x", DecodeCtx.imm, ((DecodeCtx.imm & 0xffffff) >> 2), core.IR);
 		return;
 	}
 
