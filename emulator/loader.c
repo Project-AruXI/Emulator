@@ -98,6 +98,28 @@ uint32_t loadKernel(char* filename, uint8_t* memory) {
 	return kernEntry;
 }
 
+static void loadLinkedLibraries(uint8_t* binary, uint8_t* memory) {
+	AOEFFhdr* header = (AOEFFhdr*) binary;
+
+	// Load dynamic libraries
+	AOEFFDyLibEnt* dylibEntries = (AOEFFDyLibEnt*)(binary + header->hDyLibTabOff);
+
+	for (uint32_t i = 0; i < header->hDyLibTabSize; i++) {
+		AOEFFDyLibEnt* dylibEntry = &dylibEntries[i];
+
+		// Get the name of the library
+		char* _dylibName = (char*)(binary + header->hDyLibStrTabOff + dylibEntry->dlName);
+		// The stored named as the .adlib extension, but when loading, it is assumed, need to remove it
+		char* dylibName = strdup(_dylibName);
+		char* extPos = strstr(dylibName, ".adlib");
+		if (extPos) *extPos = '\0';
+
+		dDebug(DB_BASIC, "Loading dynamic library dependency: %s", dylibName);
+
+		if (loadLibrary(dylibName, memory) != 0) dFatal(D_ERR_DLIB, "Could not load dynamic library dependency %s!", dylibName);
+	}
+}
+
 uint32_t loadBinary(char* filename, uint8_t* memory) {
 	int fd = open(filename, O_RDONLY);
 	if (fd < 0) dFatal(D_ERR_IO, "Could not open program 0x`%x` (@`%p`)!", filename, filename);
@@ -116,7 +138,7 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 	}
 	close(fd);
 
-	write(STDOUT_FILENO, "MMAP'd\n", 7);
+	// write(STDOUT_FILENO, "MMAP'd\n", 7);
 
 	uint8_t* binary = (uint8_t*) ptr;
 	AOEFFhdr* header = (AOEFFhdr*) ptr;
@@ -129,6 +151,11 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 
 	uint32_t entry = header->hEntry;
 
+
+	// Check if it has any library dependencies, if so, load them
+	// No need to check if symbols are present, that was done by the linker
+	loadLinkedLibraries(binary, memory);
+
 	// Now that it is mmap'd, load the contents
 	write(STDOUT_FILENO, "Checked format, will load\n", 26);
 
@@ -136,6 +163,8 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 	uint32_t sectHdrsSize = header->hSectSize;
 
 	// Set the data and text information
+	uint32_t fjtOffset = 0x0;
+	uint32_t djtOffset = 0x0;
 	for (uint32_t i = 0; i < sectHdrsSize; i++) {
 		AOEFFSectHdr* sectHdr = &(sectHdrs[i]);
 
@@ -160,6 +189,8 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 			uint8_t* dataStart = memory + USER_TEXT;
 			uint8_t* binaryData = binary + sectHdr->shSectOff;
 
+			djtOffset = sectHdr->shSectOff + sectHdr->shSectSize;
+
 			dDebug(DB_DETAIL, "Start of data section in binary: %p::Start of user data section in emulated memory:%p", binaryData, dataStart);
 			dDebug(DB_DETAIL, "First item in data: 0x%x from 0x%x", *(dataStart), *(binaryData));
 
@@ -168,12 +199,32 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 			uint8_t* textStart = memory + USER_TEXT;
 			uint8_t* binaryText = binary + sectHdr->shSectOff;
 
+			fjtOffset = sectHdr->shSectOff + sectHdr->shSectSize;
+
 			dDebug(DB_DETAIL, "Start of text section in binary: %p::Start of user text section in emulated memory:%p", binaryText, textStart);
 			dDebug(DB_DETAIL, "First item in text: 0x%x from 0x%x", *(textStart), *(binaryText));
 
 			memcpy(textStart, binaryText, sectHdr->shSectSize);
+		} else if (strncmp(".fjt", sectHdr->shSectName, 8) == 0) {
+			uint8_t* fjtStart = memory + USER_TEXT + fjtOffset;
+			uint8_t* binaryFjt = binary + sectHdr->shSectOff;
+
+			dDebug(DB_DETAIL, "Start of fjt section in binary: %p::Start of user fjt section in emulated memory:%p", binaryFjt, fjtStart);
+			dDebug(DB_DETAIL, "First item in fjt: 0x%x from 0x%x", *(fjtStart), *(binaryFjt));
+
+			memcpy(fjtStart, binaryFjt, sectHdr->shSectSize);
+		} else if (strncmp(".djt", sectHdr->shSectName, 8) == 0) {
+			uint8_t* djtStart = memory + USER_TEXT + djtOffset;
+			uint8_t* binaryDjt = binary + sectHdr->shSectOff;
+
+			dDebug(DB_DETAIL, "Start of djt section in binary: %p::Start of user djt section in emulated memory:%p", binaryDjt, djtStart);
+			dDebug(DB_DETAIL, "First item in djt: 0x%x from 0x%x", *(djtStart), *(binaryDjt));
+
+			memcpy(djtStart, binaryDjt, sectHdr->shSectSize);
 		}
 	}
+
+	relocate(binary, memory, USER_START);
 
 	munmap(ptr, statBuffer.st_size);
 
@@ -281,8 +332,6 @@ static bool loadLibBinary(char* path, char* libname, uint8_t* memory) {
 
 	// Copy sections in order: bss, const, data, text
 	if (libBinaryBss) {
-		uint8_t* sectStart = memory + currentSectionOffset;
-		memset(sectStart, 0, sectHdrs[0].shSectSize); // Is it needed????
 		currentSectionOffset += sectHdrs[0].shSectSize;
 	}
 	if (libBinaryConst) {
