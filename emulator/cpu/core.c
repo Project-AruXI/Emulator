@@ -31,7 +31,6 @@ static void fault() {
 		fflush(stdout);
 		flushDebug();
 		kill(sigMem->metadata.shellPID, SIGUSR1);
-		kill(sigMem->metadata.emulatorPID, SIGUSR1);
 		raise(SIGUSR1);
 	} else dLog(D_NONE, DSEV_WARN, "Was not able to set fault signal!");
 }
@@ -295,7 +294,7 @@ static void nextIR() {
 	// else BCOND
 	if (ExecuteCtx.cond) {
 		dLog(D_NONE, DSEV_INFO, "Condition true. Branching");
-		core.IR = (core.IR-4) + ((DecodeCtx.imm & 0x7ffff) << 2);
+		core.IR = (core.IR-4) + ((DecodeCtx.imm & 0x7ffff) >> 2);
 	}
 
 	if (FetchCtx.opcode == OP_ERET) {
@@ -668,7 +667,7 @@ void* runCore(void* _) {
 				// The core halts and loops but never tells either the shell (it is waiting for a signal) or the emulator
 				// Since this is a kernel issue, send the FAULT sig
 				if (runningCycles > 500 && userPS == NULL) {
-					dLog(D_NONE, DSEV_INFO, "Kernel infinite loop detected, sending fault signal");
+					dLog(D_NONE, DSEV_WARN, "Kernel infinite loop detected, sending fault signal");
 					fault();
 				}
 

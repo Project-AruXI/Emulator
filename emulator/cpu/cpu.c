@@ -90,9 +90,12 @@ char* istrmap[] = {
 };
 
 void handleSIGSEGV(int signum) {
+	sigMem->metadata.signalType = UNIVERSAL_SIG;
+	int set = setFaultSignal(GET_SIGNAL(sigMem->signals, UNIVERSAL_SIG));
 	fflush(stderr);
 	fflush(stdout);
 	flushDebug();
+	kill(sigMem->metadata.shellPID, SIGUSR1);
 	write(STDERR_FILENO, "CPU got SIGSEGV'd\n", 18);
 	if (sigMem) {
 		write(STDERR_FILENO, "sig mem in SIGSEGV\n", 19);
@@ -152,6 +155,7 @@ void handleSIGUSR1(int signum) {
 					IDLE = false;
 					pthread_mutex_unlock(&idleLock);
 					ackExecSignal(sig);
+					break;
 				case emSIG_SYS_IDX:
 					write(STDOUT_FILENO, "CPU detected SIG_SYS (acked)\n", 29);
 					write(STDOUT_FILENO, "Resuming execution\n", 19);
@@ -303,7 +307,7 @@ int main(int argc, char const* argv[]) {
 
 	// Set up
 	core.IR = entry;
-	core.SP = KERN_STACK_LIMIT;
+	core.SP = KERN_STACK_LIMIT - 0x4;
 	core.CSTR = SET_PRIV(core.CSTR); // set to kernel mode
 	core.ESR = 0x0000;
 

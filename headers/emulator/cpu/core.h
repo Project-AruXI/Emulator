@@ -42,18 +42,18 @@ typedef struct __attribute__((packed)) UserProcessThreadState {
 } PTS;
 
 typedef struct __attribute__((packed)) UserProcessState {
-	uint8_t pid;
-	uint8_t threadc;
+	uint8_t pid; // Process ID (+0)
+	uint8_t threadc; // Number of threads (+1)
 	// PTS** threadStates; // Since normal pointers are 8 bytes but pointers in the Aru architecture are 4, need to replace with uint32
-	uint32_t threadStates;
-	uint32_t sp;
-	uint32_t ir;
-	uint16_t cstr;
-	uint16_t esr;
-	uint32_t gpr[25];
-	float fpr[16];
-	vec_reg_t vr[6];
-	excp_t excpType;
+	uint32_t threadStates; // Virtual address to array of PTS pointers (+2)
+	uint32_t sp; // Stack pointer (+6)
+	uint32_t ir; // Instruction register (+10)
+	uint16_t cstr; // Code segment register (+14)
+	uint16_t esr; // Exception status register (+16)
+	uint32_t gpr[25]; // General purpose registers (+18)
+	float fpr[16]; // Floating point registers (+118)
+	vec_reg_t vr[6]; // Vector registers (+182)
+	excp_t excpType; // Exception type (+566)
 } PS;
 
 typedef struct Core {
