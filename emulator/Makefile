@@ -7,7 +7,7 @@ CC = gcc
 CFLAGS = -Wall
 INCLUDES = -I$(HEADERS)/emulator -I$(HEADERS)/emulator/cpu -I$(HEADERS) -I$(COMMON)
 
-SRCS = emulator.c loader.c backend-os.c \
+SRCS = emulator.c loader.c loader-reloc.c backend-os.c \
 	$(SHARED)/diagnostics.c $(SHARED)/emSignal.c $(SHARED)/signalHandler.c $(SHARED)/sigHeap.c
 LIBS = $(COMMON)/libargparse.a
 TARGET = $(OUT)/ruemu
@@ -26,7 +26,7 @@ ruemu: $(OBJS)
 cpu:
 	(cd cpu && make $@)
 
-debug: CFLAGS += -g -O0 -DDEBUG=2
+debug: CFLAGS += -g -O0 -DDEBUG=3
 debug: ruemu
 
 

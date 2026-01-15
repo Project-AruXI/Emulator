@@ -379,7 +379,7 @@ action_t shellHelp(int argc, char** argv) {
 		printf("path show\n");
 		printf("path add [path]\n");
 		printf("help [cmd]\n");
-		printf("[program]\n");
+		printf("run [program]\n");
 		// printf("debug\n");
 	}
 
@@ -471,7 +471,7 @@ action_t runProgram(int argc, char** _argv) {
 	sigMem->metadata.signalType = SHELL_CPU_SIG;
 	signal_t* shellCPUSignal = GET_SIGNAL(sigMem->signals, SHELL_CPU_SIG);
 	execprog_md execMetadata = {
-		.entry = 0xB8080000 + 32 // known kernel entry point for running user programs
+		.entry = 0xB8080000 + 8 // known kernel entry point for running user programs
 	};
 	ret = setExecSignal(shellCPUSignal, &execMetadata);
 	if (ret == -1) dFatal(D_ERR_SIGNAL, "No access for load signal!");
@@ -500,7 +500,7 @@ action_t eval(Command* cmd) {
 	else if (strcasecmp(cmd->command, "env") == 0) return handleEnv(cmd->argc, cmd->argv);
 	else if (strcasecmp(cmd->command, "path") == 0) return handlePath(cmd->argc, cmd->argv);
 	else if (strcasecmp(cmd->command, "help") == 0) return shellHelp(cmd->argc, cmd->argv);
-	else return runProgram(cmd->argc, cmd->argv);
+	else if (strcasecmp(cmd->command, "run") == 0) return runProgram(cmd->argc, cmd->argv);
 }
 
 int main(int argc, char const* argv[]) {
