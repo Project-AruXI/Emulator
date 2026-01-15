@@ -31,6 +31,7 @@ static void fault() {
 		fflush(stdout);
 		flushDebug();
 		kill(sigMem->metadata.shellPID, SIGUSR1);
+		kill(sigMem->metadata.emulatorPID, SIGUSR1);
 		raise(SIGUSR1);
 	} else dLog(D_NONE, DSEV_WARN, "Was not able to set fault signal!");
 }
@@ -38,7 +39,7 @@ static void fault() {
 static void exception(uint16_t excpNum) {
 	dLog(D_NONE, DSEV_INFO, "Exception 0x%x!", excpNum);
 
-	uint32_t __psPtr = KERN_DATA + 0x4; // The virtual address where the pointer to PS is stored
+	uint32_t __psPtr = KERN_DATA; // The virtual address where the pointer to PS is stored
 	uint8_t* _psPtr = emMem + __psPtr; // The real address where the pointer to PS is stored
 	uint32_t psPtr = *((uint32_t*)_psPtr); // The virtual address of PS
 	userPS = (PS*) (emMem + psPtr);
@@ -602,8 +603,8 @@ void* runCore(void* _) {
 	dLog(D_NONE, DSEV_INFO, "Executing core thread...");
 	core.status = STAT_RUNNING;
 
-	int runningCycles = 0;
-	int idleCycles = 0;
+	unsigned long runningCycles = 0;
+	unsigned long idleCycles = 0;
 	while (true) {
 		pthread_mutex_lock(&idleLock);
 		if (!IDLE) {
@@ -657,6 +658,19 @@ void* runCore(void* _) {
 						sig->interrupts = SIG_SET(sig->interrupts, emSIG_EXIT_IDX);
 					}
 				} else pthread_cond_signal(&idleCond);
+				// In the else case, it means that userPS is null
+				// The only times it is null is before any user program is run
+				// This causes the situation where the user setup kernel code can loop (causing the check leading to the halt)
+				// However, since userPS is null, it only signals
+				// This signal is only user to the main cpu at the initial setup phase
+				// However, it serves no purpose after
+				// In other words, on load user program but before running it, if the kernel is looping infinitely
+				// The core halts and loops but never tells either the shell (it is waiting for a signal) or the emulator
+				// Since this is a kernel issue, send the FAULT sig
+				if (runningCycles > 500 && userPS == NULL) {
+					dLog(D_NONE, DSEV_INFO, "Kernel infinite loop detected, sending fault signal");
+					fault();
+				}
 
 				// Reset cycles???
 				runningCycles = 0;
