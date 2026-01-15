@@ -87,8 +87,9 @@ void loadLibraryRuntime(char* filename, uint8_t* memory);
  * @param binary The binary image
  * @param memory The emulated memory
  * @param vAddr The start address of the binary in emulated memory
+ * @param libCache The dynamic library cache used to gather the symbols
  */
-void relocate(uint8_t* binary, uint8_t* memory, uint32_t vAddr);
+void relocate(uint8_t* binary, uint8_t* memory, uint32_t vAddr, DyLibCache* libCache);
 
 
 #endif

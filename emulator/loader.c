@@ -35,6 +35,8 @@ static void addLibToCache(DyLibCache* cache, char* libname, uint32_t vaddr, uint
 	dylib->paddr = paddr;
 	// dylib->symbols.symbs = symbs;
 	// dylib->symbols.count = symbCount;
+
+	dDebug(DB_BASIC, "Added library `%s` to cache.", libname);
 }
 
 
@@ -104,7 +106,8 @@ static void loadLinkedLibraries(uint8_t* binary, uint8_t* memory) {
 	// Load dynamic libraries
 	AOEFFDyLibEnt* dylibEntries = (AOEFFDyLibEnt*)(binary + header->hDyLibTabOff);
 
-	for (uint32_t i = 0; i < header->hDyLibTabSize; i++) {
+	// Starting at 1 becuase 0 is always the standard library which is already loaded
+	for (uint32_t i = 1; i < header->hDyLibTabSize; i++) {
 		AOEFFDyLibEnt* dylibEntry = &dylibEntries[i];
 
 		// Get the name of the library
@@ -224,7 +227,7 @@ uint32_t loadBinary(char* filename, uint8_t* memory) {
 		}
 	}
 
-	relocate(binary, memory, USER_START);
+	relocate(binary, memory, USER_START, &dylibCache);
 
 	munmap(ptr, statBuffer.st_size);
 
