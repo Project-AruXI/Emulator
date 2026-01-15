@@ -42,7 +42,6 @@ static void handleLoadSignal(signal_t* emuShellSig) {
 	uint32_t userEntry = loadBinary(filename, emulatedMemory);
 
 	// Place entry point at the top of kernel stack
-	// For some reason, the pointer needs to be type uint32 so it writes all of the bits of the entry
 	*(uint32_t*)((uint8_t*)emulatedMemory + 0xFFFFFFFB) = userEntry;
 
 	// Place arv/argc in user stack
@@ -60,7 +59,7 @@ static void handleLoadSignal(signal_t* emuShellSig) {
 static void handleFaultSignal(signal_t* emuCPUSig) {
 	// Only time emulator gets fault signal is on user abort exception
 	// Do a "coredump"
-	uint32_t ___psPtr = KERN_DATA + 0x4; // The virtual address where the pointer to PS is stored
+	uint32_t ___psPtr = KERN_DATA; // The virtual address where the pointer to PS is stored
 	uint8_t* __psPtr = emulatedMemory + ___psPtr; // The real address where the pointer to PS is stored
 	uint32_t _psPtr = *((uint32_t*)__psPtr); // The virtual address of PS
 	uint8_t* psPtr = (((uint8_t*)emulatedMemory) + _psPtr);
