@@ -1,9 +1,12 @@
 CC = gcc
 CFLAGS = -Wall
-
+COMMON_LIBDIR = ./common/lib
 
 all: ruemu cpu shell
 
+
+commonlibs:
+	$(MAKE) -C $(COMMON_LIBDIR) libargparse
 
 ruemu:
 	(cd emulator && make $@)

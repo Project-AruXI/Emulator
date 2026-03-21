@@ -1,10 +1,12 @@
 SHARED = ../../shared
+COMMON = ../../common
 HEADERS = ../../headers
+COMMON_LIBDIR = $(COMMON)/lib
 OUT = ../../out
 
 CC = gcc
 CFLAGS = -Wall -lpthread
-INCLUDES = -I$(HEADERS)/emulator/cpu -I$(HEADERS)/emulator -I$(HEADERS)
+INCLUDES = -I$(HEADERS)/emulator/cpu -I$(HEADERS)/emulator -I$(HEADERS) -I$(COMMON)/defs/instr
 
 SRCS = cpu.c core.c mem.c hardware.c $(SHARED)/emSignal.c $(SHARED)/diagnostics.c \
 	$(SHARED)/signalHandler.c $(SHARED)/sigHeap.c
